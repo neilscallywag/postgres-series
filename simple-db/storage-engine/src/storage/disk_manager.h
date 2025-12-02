@@ -1,59 +1,73 @@
 #pragma once
 
-#include <string>
-#include <fstream>
 #include "storage/page.h"
+#include <fstream>
+#include <string>
 
 /**
- * @brief Manages on-disk storage of database pages.
+ * @brief Responsible for durable storage of fixed-size pages on disk.
  *
- * DiskManager is responsible for:
- *   - Creating/opening a database file
- *   - Writing fixed-size pages (PAGE_SIZE bytes)
- *   - Reading pages from file
- *   - Ensuring the file grows as new pages are written
+ * DiskManager abstracts the database file format. It provides:
  *
- * DiskManager does NOT cache pages—that is handled by the BufferPoolManager.
- * DiskManager simply provides durable, page-based I/O.
+ *   - Binary read/write access to page-sized blocks (PAGE_SIZE bytes)
+ *   - Automatic file growth when writing pages past the current end-of-file
+ *   - Zero-filled pages when reading from uninitialized regions
+ *   - Stable mapping between page_id -> file offset
+ *
+ * The DiskManager itself does NOT:
+ *
+ *   - Cache pages in memory (BufferPoolManager handles that)
+ *   - Track free pages or allocation (that will be a higher-level component)
+ *   - Perform any concurrency control or locking
+ *
+ * ## File Layout
+ * Pages are stored sequentially in the database file:
+ *
+ *   offset = page_id * PAGE_SIZE
+ *
+ * Every page write is exactly PAGE_SIZE bytes. If a write occurs beyond the
+ * current end-of-file, the file is automatically extended.
+ *
+ * ## Error Handling
+ * Unwritten pages (i.e., holes beyond EOF) are returned as zero-filled pages.
  */
 class DiskManager {
 public:
+  /**
+   * @brief Open or create a database file.
+   *
+   * If the file does not exist, it is created. The file is opened in binary
+   * read/write mode. No buffering is used — operations are performed directly
+   * on the file stream.
+   */
+  DiskManager(const std::string &filename);
 
-    /**
-     * @brief Construct a DiskManager for a given database file.
-     *
-     * If the file does not exist, it will be created. The file is opened in
-     * binary read/write mode.
-     *
-     * @param filename The path to the database file.
-     */
-    DiskManager(const std::string& filename);
+  /// @brief Close the underlying file stream.
+  ~DiskManager();
 
-    /**
-     * @brief Destructor: closes the underlying file stream.
-     */
-    ~DiskManager();
+  /**
+   * @brief Write one page to disk.
+   *
+   * @param page_id The zero-based page index.
+   * @param page    The Page containing data to write.
+   *
+   * Writes exactly PAGE_SIZE bytes. Writing to page_ids beyond EOF will
+   * cause the on-disk file to expand.
+   */
+  void WritePage(uint32_t page_id, Page *page);
 
-    /**
-     * @brief Write a page to disk at the given page ID.
-     *
-     * @param page_id  The zero-based page index.
-     * @param page     Pointer to the in-memory Page to write.
-     *
-     * The file will be automatically grown if writing past the current end.
-     */
-    void WritePage(uint32_t page_id, Page* page);
-
-    /**
-     * @brief Read a page from disk into the given Page object.
-     *
-     * @param page_id  The zero-based page index.
-     * @param page     Pointer to the destination Page object.
-     *
-     * If reading past EOF, the output page is zero-filled.
-     */
-    void ReadPage(uint32_t page_id, Page* page);
+  /**
+   * @brief Read a page from disk.
+   *
+   * @param page_id The zero-based page index.
+   * @param page    Output buffer to store the read data.
+   *
+   * If the requested page lies beyond EOF, the output page is fully
+   * zero-filled. If only part of the page can be read, the remainder
+   * is zero-filled.
+   */
+  void ReadPage(uint32_t page_id, Page *page);
 
 private:
-    std::fstream db_file_; ///< Underlying file stream for the database file
+  std::fstream db_file_; ///< File stream for the database file
 };

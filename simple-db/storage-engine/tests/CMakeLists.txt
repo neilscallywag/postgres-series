@@ -1,5 +1,6 @@
 add_executable(storage_tests
     test_page.cpp
+    test_disk_manager.cpp
 )
 
 target_link_libraries(storage_tests
