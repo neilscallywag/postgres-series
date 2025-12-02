@@ -1,0 +1,70 @@
+services:
+  primary:
+    build:
+      context: .
+      dockerfile: Dockerfile.pg17
+    container_name: pg-primary
+    environment:
+      POSTGRES_PASSWORD: pass
+    cap_add:
+      - NET_ADMIN
+    volumes:
+      - primary_data:/var/lib/postgresql/data
+    networks:
+      - pgnet
+    ports:
+      - "5432:5432"
+
+  sync1:
+    build:
+      context: .
+      dockerfile: Dockerfile.pg17
+    container_name: pg-sync1
+    environment:
+      POSTGRES_PASSWORD: pass
+    cap_add:
+      - NET_ADMIN
+    networks:
+      - pgnet
+    volumes:
+      - sync1_data:/var/lib/postgresql/data
+    entrypoint: ["sleep", "infinity"]   # <-- DO NOT START POSTGRES YET (IMPORTANT)
+
+  sync2:
+    build:
+      context: .
+      dockerfile: Dockerfile.pg17
+    container_name: pg-sync2
+    environment:
+      POSTGRES_PASSWORD: pass
+    cap_add:
+      - NET_ADMIN
+    networks:
+      - pgnet
+    volumes:
+      - sync2_data:/var/lib/postgresql/data
+    entrypoint: ["sleep", "infinity"]
+
+  async1:
+    build:
+      context: .
+      dockerfile: Dockerfile.pg17
+    container_name: pg-async1
+    environment:
+      POSTGRES_PASSWORD: pass
+    cap_add:
+      - NET_ADMIN
+    networks:
+      - pgnet
+    volumes:
+      - async1_data:/var/lib/postgresql/data
+    entrypoint: ["sleep", "infinity"]
+
+networks:
+  pgnet:
+
+volumes:
+  primary_data:
+  sync1_data:
+  sync2_data:
+  async1_data:
